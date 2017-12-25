@@ -1,0 +1,40 @@
+- hosts:
+    - all
+  tasks:
+    - become:      yes
+      become_user: root
+      block:
+        - name:     Install required packages for apt_key and apt_repository
+          apt:      name={{ item }}
+          with_items:
+            - apt-transport-https
+            - ca-certificates
+            - curl
+            - software-properties-common
+
+        - name:     Add Docker repository key
+          apt_key:
+            url:    https://download.docker.com/linux/ubuntu/gpg
+            id:     9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+          register: docker_repository_key
+          ignore_errors: true #FIX_UP This is a bad practice. I use this directive to fix problems with the GPG key.
+          # https://github.com/ansible/ansible/issues/12161#issuecomment-136528093
+
+        - name:     Add Docker apt key v2
+          shell:    "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -"
+          args:
+            warn:   no
+          when:     docker_repository_key|failed
+
+        - name:     Add Docker apt repository
+          apt_repository:
+            repo:   "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+            state:  present
+
+        - name:     Install system updates for Debian
+          apt:      update_cache=yes
+
+        - name:     Install Docker
+          package:
+            name:   docker-ce
+            state:  latest
